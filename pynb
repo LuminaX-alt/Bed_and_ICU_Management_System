@@ -1,0 +1,278 @@
+!pip install gradio --quiet
+import sqlite3
+
+# Connect to SQLite
+conn = sqlite3.connect("hospital.db")
+cursor = conn.cursor()
+
+# Create beds table
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS beds (
+    bed_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bed_type TEXT,
+    is_occupied INTEGER DEFAULT 0,
+    patient_name TEXT
+)
+''')
+
+# Insert 5 ICU and 15 General beds if not already present
+cursor.execute("SELECT COUNT(*) FROM beds")
+if cursor.fetchone()[0] == 0:
+    for i in range(1, 21):
+        bed_type = "ICU" if i <= 5 else "General"
+        cursor.execute("INSERT INTO beds (bed_type) VALUES (?)", (bed_type,))
+conn.commit()
+conn.close()
+import pandas as pd
+import gradio as gr
+
+# View current bed status
+def view_beds():
+    conn = sqlite3.connect("hospital.db")
+    df = pd.read_sql_query("SELECT * FROM beds", conn)
+    conn.close()
+    return df
+
+# Assign a bed to a patient
+def assign_bed(bed_id, patient_name):
+    conn = sqlite3.connect("hospital.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_occupied FROM beds WHERE bed_id=?", (bed_id,))
+    result = cursor.fetchone()
+    if result is None:
+        return "❌ Invalid Bed ID"
+    if result[0] == 1:
+        return "❌ Bed is already occupied."
+    cursor.execute("UPDATE beds SET is_occupied=1, patient_name=? WHERE bed_id=?", (patient_name, bed_id))
+    conn.commit()
+    conn.close()
+    return f"✅ Bed {bed_id} assigned to {patient_name}"
+
+# Release a bed
+def release_bed(bed_id):
+    conn = sqlite3.connect("hospital.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_occupied FROM beds WHERE bed_id=?", (bed_id,))
+    result = cursor.fetchone()
+    if result is None:
+        return "❌ Invalid Bed ID"
+    if result[0] == 0:
+        return "❌ Bed is already free."
+    cursor.execute("UPDATE beds SET is_occupied=0, patient_name=NULL WHERE bed_id=?", (bed_id,))
+    conn.commit()
+    conn.close()
+    return f"✅ Bed {bed_id} released successfully"
+import pandas as pd
+import gradio as gr
+
+# View current bed status
+def view_beds():
+    conn = sqlite3.connect("hospital.db")
+    df = pd.read_sql_query("SELECT * FROM beds", conn)
+    conn.close()
+    return df
+
+# Assign a bed to a patient
+def assign_bed(bed_id, patient_name):
+    conn = sqlite3.connect("hospital.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_occupied FROM beds WHERE bed_id=?", (bed_id,))
+    result = cursor.fetchone()
+    if result is None:
+        return "❌ Invalid Bed ID"
+    if result[0] == 1:
+        return "❌ Bed is already occupied."
+    cursor.execute("UPDATE beds SET is_occupied=1, patient_name=? WHERE bed_id=?", (patient_name, bed_id))
+    conn.commit()
+    conn.close()
+    return f"✅ Bed {bed_id} assigned to {patient_name}"
+
+# Release a bed
+def release_bed(bed_id):
+    conn = sqlite3.connect("hospital.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_occupied FROM beds WHERE bed_id=?", (bed_id,))
+    result = cursor.fetchone()
+    if result is None:
+        return "❌ Invalid Bed ID"
+    if result[0] == 0:
+        return "❌ Bed is already free."
+    cursor.execute("UPDATE beds SET is_occupied=0, patient_name=NULL WHERE bed_id=?", (bed_id,))
+    conn.commit()
+    conn.close()
+    return f"✅ Bed {bed_id} released successfully"
+  with gr.Blocks() as bed_ui:
+    gr.Markdown("## 🏥 AI-Based Bed and ICU Management System")
+
+    view_btn = gr.Button("🔄 View All Beds")
+    bed_table = gr.Dataframe(headers=["bed_id", "bed_type", "is_occupied", "patient_name"], interactive=False)
+    view_btn.click(view_beds, outputs=bed_table)
+
+    gr.Markdown("### 🚑 Assign Bed")
+    assign_id = gr.Number(label="Enter Bed ID to Assign")
+    patient_name = gr.Textbox(label="Patient Name")
+    assign_btn = gr.Button("Assign Bed")
+    assign_output = gr.Textbox()
+    assign_btn.click(assign_bed, inputs=[assign_id, patient_name], outputs=assign_output)
+
+    gr.Markdown("### 🧹 Release Bed")
+    release_id = gr.Number(label="Enter Bed ID to Release")
+    release_btn = gr.Button("Release Bed")
+    release_output = gr.Textbox()
+    release_btn.click(release_bed, inputs=release_id, outputs=release_output)
+
+bed_ui.launch()
+# AI-Based Bed and ICU Management System with Gradio Dashboard
+
+import sqlite3
+import pandas as pd
+import gradio as gr
+from datetime import datetime
+
+# Helper: Authenticate user
+def authenticate_user(username, password):
+    conn = sqlite3.connect("hospital.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT role FROM users WHERE username=? AND password=?", (username, password))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else None
+
+# Helper: View beds
+def view_beds():
+    conn = sqlite3.connect("hospital.db")
+    df = pd.read_sql_query("SELECT * FROM beds", conn)
+    conn.close()
+    return df
+
+# Helper: Assign bed
+
+def assign_bed(bed_id, patient_name, doctor_name):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect("hospital.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_occupied FROM beds WHERE bed_id=?", (bed_id,))
+    result = cursor.fetchone()
+    if not result:
+        return "❌ Invalid Bed ID"
+    if result[0] == 1:
+        return "❌ Bed is already occupied."
+    cursor.execute("UPDATE beds SET is_occupied=1, patient_name=?, doctor_name=?, admitted_at=?, released_at=NULL WHERE bed_id=?", 
+                   (patient_name, doctor_name, now, bed_id))
+    conn.commit()
+    conn.close()
+    return f"✅ Bed {bed_id} assigned to {patient_name} under Dr. {doctor_name}"
+
+# Helper: Release bed
+
+def release_bed(bed_id):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect("hospital.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT patient_name, doctor_name, admitted_at, bed_type FROM beds WHERE bed_id=? AND is_occupied=1", (bed_id,))
+    result = cursor.fetchone()
+    if not result:
+        return "❌ Bed is already free or invalid."
+    patient_name, doctor_name, admitted_at, bed_type = result
+    billing_amount = 1000 if bed_type == 'General' else 5000
+    cursor.execute("UPDATE beds SET is_occupied=0, released_at=?, billing_amount=?, patient_name=NULL, doctor_name=NULL, admitted_at=NULL WHERE bed_id=?", 
+                   (now, billing_amount, bed_id))
+    cursor.execute("INSERT INTO bed_logs (bed_id, patient_name, doctor_name, admitted_at, released_at, billing_amount) VALUES (?, ?, ?, ?, ?, ?)",
+                   (bed_id, patient_name, doctor_name, admitted_at, now, billing_amount))
+    conn.commit()
+    conn.close()
+    return f"✅ Bed {bed_id} released. Bill: ₹{billing_amount}"
+
+# Helper: View Analytics
+
+def view_analytics():
+    conn = sqlite3.connect("hospital.db")
+    df = pd.read_sql_query("SELECT bed_type, is_occupied, COUNT(*) as count FROM beds GROUP BY bed_type, is_occupied", conn)
+    conn.close()
+    summary = df.pivot(index='bed_type', columns='is_occupied', values='count').fillna(0).astype(int)
+    summary.columns = ['Free', 'Occupied']
+    return summary.reset_index()
+
+# Gradio Login and Dashboard
+
+def launch_dashboard(user, passwd):
+    role = authenticate_user(user, passwd)
+    if not role:
+        return gr.update(visible=True), gr.update(visible=False), "❌ Invalid credentials."
+    return gr.update(visible=False), gr.update(visible=True), f"✅ Welcome {user} ({role})"
+
+def gradio_ui():
+    with gr.Blocks() as demo:
+        gr.Markdown("# 🏥 AI-Based Bed & ICU Management System")
+
+        with gr.Column():
+            with gr.Row():
+                user = gr.Textbox(label="Username")
+                passwd = gr.Textbox(label="Password", type="password")
+            login_btn = gr.Button("Login")
+            login_msg = gr.Textbox(label="Login Status")
+
+        dashboard = gr.Column(visible=False)
+
+        with dashboard:
+            with gr.Row():
+                view_btn = gr.Button("🔍 View Beds")
+                df_view = gr.Dataframe(interactive=False)
+                view_btn.click(view_beds, outputs=df_view)
+
+            with gr.Row():
+                gr.Markdown("### 🚑 Assign Bed")
+                aid = gr.Number(label="Bed ID")
+                pname = gr.Textbox(label="Patient Name")
+                dname = gr.Textbox(label="Doctor Name")
+                assign_btn = gr.Button("Assign")
+                assign_out = gr.Textbox()
+                assign_btn.click(assign_bed, inputs=[aid, pname, dname], outputs=assign_out)
+
+            with gr.Row():
+                gr.Markdown("### 🧹 Release Bed")
+                rid = gr.Number(label="Bed ID")
+                release_btn = gr.Button("Release")
+                release_out = gr.Textbox()
+                release_btn.click(release_bed, inputs=rid, outputs=release_out)
+
+            with gr.Row():
+                gr.Markdown("### 📊 Analytics")
+                stats_btn = gr.Button("View Occupancy Analytics")
+                stats_df = gr.Dataframe(interactive=False)
+                stats_btn.click(view_analytics, outputs=stats_df)
+
+        login_btn.click(launch_dashboard, inputs=[user, passwd], outputs=[login_msg, dashboard, login_msg])
+    return demo
+
+# Launch
+ui = gradio_ui()
+ui.launch()
+pip install twilio
+# twilio_config.py (Create this file)
+ACCOUNT_SID = "AC9be8ea651078164b7a547c94df319c3b"
+AUTH_TOKEN = "1772e7c63d425c172ad45ca92a183155"
+TWILIO_NUMBER = "+1 978 775 8909"  # Twilio virtual number
+ADMIN_NUMBER = "+919123144609"  # Admin's mobile number
+with open("twilio_config.py", "w") as f:
+    f.write('''\
+ACCOUNT_SID = "AC9be8ea651078164b7a547c94df319c3b"
+AUTH_TOKEN = "1772e7c63d425c172ad45ca92a183155"
+TWILIO_NUMBER = "+1 978 775 8909"  # Your Twilio trial number
+ADMIN_NUMBER = "+919123144609"  # Your phone number to receive alerts
+''')
+  from twilio.rest import Client
+from twilio_config import ACCOUNT_SID, AUTH_TOKEN, TWILIO_NUMBER, ADMIN_NUMBER
+
+def send_sms_alert(message, to_number=ADMIN_NUMBER):
+    try:
+        client = Client(ACCOUNT_SID, AUTH_TOKEN)
+        msg = client.messages.create(
+            body=message,
+            from_=TWILIO_NUMBER,
+            to=to_number
+        )
+        return f"✅ Alert sent: SID {msg.sid}"
+    except Exception as e:
+        return f"❌ SMS Failed: {str(e)}"
+      send_sms_alert("🚨 Test Alert: This is a test message from your AI Bed & ICU Manager.")
